@@ -1,0 +1,53 @@
+;;(require 'cl)
+;; note: had trouble using cl-flet for mocks
+
+(ert-deftest addition-test ()
+       (should (= (+ 1 2) 3)))
+
+;;vt-textoids-get-next-cell-pos (cur-pos-x, cur-pos-y, vx, vy, try-num)
+(ert-deftest vt-textoids-do-something-test ()
+  (should (= (vt-textoids-do-something) 7))
+  )
+
+(ert-deftest vt-textoids-get-next-cell-pos-test ()
+  (should (= (nth 2 (vt-textoids-get-next-cell-pos 0 0 0 0 3)) VT-TEXTOIDS-CELL-DONE-FLAG) )
+  )
+
+;; test get-next-cell-pos with a mock 'vt-textoids-has-brick returning false
+(ert-deftest vt-textoids-get-next-cell-pos-test-2 ()
+  (let ((result nil)) 
+    (flet ((vt-textoids-has-brick (x y)  nil))
+      (setq result (vt-textoids-get-next-cell-pos 1 2 0 1))
+      ;;(message "result=%s" result)
+      (should (= (nth 0 result) 1))
+      (should (= (nth 1 result) 3))
+      (should (= (nth 2 result) 0))
+      ))
+  )
+
+;; test get-next-cell-pos with a mock 'vt-textoids-has-brick returning true
+(ert-deftest vt-textoids-get-next-cell-pos-test-3 ()
+  (let ((result nil)) 
+    (flet
+        ((vt-textoids-has-brick (x y) (if (= x 2) t nil))
+         (rand (n) 0))
+
+      (setq result (vt-textoids-get-next-cell-pos 2 2 0 1))
+      (message "***result=%s" result)
+      ;; (should (= (nth 0 result) 1))
+      ;; (should (= (nth 1 result) 2))
+      ;; (should (= (nth 2 result) 0))
+      ))
+  )
+
+;; (ert-deftest vt-casc-dummy-test ()
+;;   (should (= (vt-casc-dummy) 3))                
+;;  )
+
+;;(vt-mac-5)
+;;(setq c (read (vt-mac-5)))
+;;(insert (format "\n%s" (eval (nth 2 c)) ))
+;; note: you have to re-eval it again if you want to override any versions
+;; active in the repl.
+;;(ert-deftest vt-inc-test nil (should (= (vt-inc 7) 8)))
+

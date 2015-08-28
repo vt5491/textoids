@@ -17,6 +17,8 @@
 
 (global-set-key "\C-cz" 'vt-textoids-run-game)
 (global-set-key "\C-cx" 'vt-textoids-kill-timer)
+(setq VT-TEXTOIDS-CELL-DONE-FLAG -100)
+(setq VT-TEXTOIDS-SNAKE-DONE-FLAG -200)
 
 ;; set global vars here
 (defun vt-textoids-init ()
@@ -30,7 +32,7 @@
   (setq vt-textoids-tick-period 1.0)
   (setq vt-textoids-brick-char ?B)
   (setq vt-textoids-brick-length 4)  
-  ;; see also vt-textoids-init-ship
+  ;; see also vt-textoids-init-snake
   (let ((i 0))
     (setq vt-textoids-bg-row "")
     (while (< i (- vt-textoids-canvas-width 1))       
@@ -39,6 +41,20 @@
     (setq vt-textoids-bg-row (cl-concatenate 'string vt-textoids-bg-row "\n"))
     )
 )
+
+(defun vt-textoids-init-snake ()
+  (setq vt-textoids-snake-char ?A)
+  ;; (setq vt-textoids-snake-x 1)
+  ;; (setq vt-textoids-snake-y (/ vt-textoids-canvas-width 2))
+  (setq vt-textoids-snake-x (/ vt-textoids-canvas-width 2))
+  (setq vt-textoids-snake-y 1)
+  ;;Note: x is horizontal, y is vertical...nope I fixed this
+  (setq vt-textoids-snake-vx 0)
+  (setq vt-textoids-snake-vy 1)
+  (setq vt-textoids-snake-length 5)
+  (setq vt-textoids-snake nil )
+  (setq vt-textoids-snake-head 0)
+  )
 
 (defun vt-textoids-init-canvas ()
   (let ((first-time-flag nil))
@@ -168,36 +184,25 @@
 
 ;;(vt-textoids-init-canvas)
 
-(defun vt-textoids-init-ship ()
-  (setq vt-textoids-ship-char ?A)
-  (setq vt-textoids-ship-x 1)
-  (setq vt-textoids-ship-y (/ vt-textoids-canvas-width 2))
-  ;;Note: x is horizontal, y is vertical
-  (setq vt-textoids-ship-vx 1)
-  (setq vt-textoids-ship-vy 0)
-  (setq vt-textoids-ship-length 5)
-  (setq vt-textoids-ship nil )
-  (setq vt-textoids-ship-head 0)
-  )
 
-;; bump the ship history matrix, so each element of the snake gets passed
+;; bump the snake history matrix, so each element of the snake gets passed
 ;; down the line
-;; (defun vt-textoids-bump-ship ()
-;;   (message "vt-textoids-bump-ship: entered")
-;;   (let ((tail (aref vt-textoids-ship i)))
-;;     (cl-loop for i from (1- vt-textoids-ship-length) downto 1 do 
-;;              (aset vt-textoids-ship (1- i) (aref vt-textoids-ship i)) 
+;; (defun vt-textoids-bump-snake ()
+;;   (message "vt-textoids-bump-snake: entered")
+;;   (let ((tail (aref vt-textoids-snake i)))
+;;     (cl-loop for i from (1- vt-textoids-snake-length) downto 1 do 
+;;              (aset vt-textoids-snake (1- i) (aref vt-textoids-snake i)) 
 ;;     )
 ;;     ;; return tail to caller so he can erase
 ;;     tail
 ;;     )
 ;; )
-;; determine the next position for the ship
-;; (defun vt-textoids-get-ship-pos ()
+;; determine the next position for the snake
+;; (defun vt-textoids-get-snake-pos ()
 ;;   (condition-case err
-;; (message "vt-textoids-get-ship-pos: entered")
+;; (message "vt-textoids-get-snake-pos: entered")
 ;;     (let (
-;;           (cand-point (+ (* vt-textoids-ship-x vt-textoids-canvas-width) vt-textoids-ship-y)          )
+;;           (cand-point (+ (* vt-textoids-snake-x vt-textoids-canvas-width) vt-textoids-snake-y)          )
 ;;          )
 ;;       (message "fuck")
 ;;       ;;(message "buffer-substring=%s" (buffer-substring  cand-pos cand-pos))
@@ -205,16 +210,27 @@
 ;;           (message "found brick at %d" cand-point)
 ;;         )
 
-;;       (message "vt-textoids-get-ship-pos: cand-point=%d" cand-point)
+;;       (message "vt-textoids-get-snake-pos: cand-point=%d" cand-point)
 ;;       cand-point
 ;;       )
-;; (error (princ (format "vt-textoids-get-ship-pos: The error was: %s" err)))
+;; (error (princ (format "vt-textoids-get-snake-pos: The error was: %s" err)))
 ;;     )
 ;;   )
 
+;; return the x-coord of point
+(defun vt-textoids-get-point-x (point)
+  (% point vt-textoids-canvas-width)
+  )
+
+;; return the y-coord of point
+(defun vt-textoids-get-point-y (point)
+  (/ point vt-textoids-canvas-width)
+  )
+
 ;; return buffers point given an x and y pos
 (defun vt-textoids-get-point (x y)
-  (+ (* x vt-textoids-canvas-width) y)
+  ;;(+ (* x vt-textoids-canvas-width) y)
+  (+ (* y vt-textoids-canvas-width) x)
   )
 
 ;; return true if brick is found at point
@@ -226,12 +242,17 @@
     found
   )
 )
+
+(defun vt-textoids-has-brick (x y)
+  (vt-textoids-brick-at-point (vt-textoids-get-point x y))
+  )
+
 ;; TODO: refactor it so cand-point is not a global
-(defun vt-textoids-get-ship-pos ()
+(defun vt-textoids-get-snake-pos ()
   ;; (condition-case err 
-  (message "vt-textoids-get-ship-pos: entered")
-  ;;(setq vt-textoids-cand-point (+ (* vt-textoids-ship-x vt-textoids-canvas-width) vt-textoids-ship-y))
-  (setq vt-textoids-cand-point (vt-textoids-get-point vt-textoids-ship-x  vt-textoids-ship-y))
+  (message "vt-textoids-get-snake-pos: entered")
+  ;;(setq vt-textoids-cand-point (+ (* vt-textoids-snake-x vt-textoids-canvas-width) vt-textoids-snake-y))
+  (setq vt-textoids-cand-point (vt-textoids-get-point vt-textoids-snake-x  vt-textoids-snake-y))
   ;;(message "fuck")
   (message "buffer-substring-no-properties=%s" (buffer-substring-no-properties  vt-textoids-cand-point (1+  vt-textoids-cand-point)))
   ;; (when (string-equal (buffer-substring-no-properties  vt-textoids-cand-point (1+ vt-textoids-cand-point) (char-to-string vt-textoids-brick-char)))
@@ -243,69 +264,121 @@
   ;;   (message "found brick at %d" vt-textoids-cand-point)
   (when (vt-textoids-brick-at-point vt-textoids-cand-point)
     (message "found brick at %d" vt-textoids-cand-point)
-    ;; go back to prior point in ship
-    (setq vt-textoids-cand-point (car vt-textoids-ship))
+    ;; go back to prior point in snake
+    (setq vt-textoids-cand-point (car vt-textoids-snake))
     ;; try a new cand point
-    ;; (if (not (equal vt-textoids-ship-vx 0))
-    ;;     (setq vt-textoids-ship-vx))
+    ;; (if (not (equal vt-textoids-snake-vx 0))
+    ;;     (setq vt-textoids-snake-vx))
     ;; (cond (
-    ;;   (not (equal vt-textoids-ship-vx 0)) (setq vt-textoids-ship-vx)(setq vt-textoids-ship-vy 1))
+    ;;   (not (equal vt-textoids-snake-vx 0)) (setq vt-textoids-snake-vx)(setq vt-textoids-snake-vy 1))
 
     ;; )
-    ;; TODO: can probably go recursive here and call vt-textoids-get-ship-pos again
-    (cond ((not (equal vt-textoids-ship-vx 0)) (setq vt-textoids-ship-vx 0)(setq vt-textoids-ship-vy (if (equal (random 2) 0) 1 -1)))
-    ((not (equal vt-textoids-ship-vy 0)) (setq vt-textoids-ship-vx (if (equal (random 2) 0) 1 -1))(setq vt-textoids-ship-vy 0))
+    ;; TODO: can probably go recursive here and call vt-textoids-get-snake-pos again
+    (cond ((not (equal vt-textoids-snake-vx 0)) (setq vt-textoids-snake-vx 0)(setq vt-textoids-snake-vy (if (equal (random 2) 0) 1 -1)))
+    ((not (equal vt-textoids-snake-vy 0)) (setq vt-textoids-snake-vx (if (equal (random 2) 0) 1 -1))(setq vt-textoids-snake-vy 0))
        (t "dont know"))    
     )
   
 ;;     )
   ;;vt-textoids-cand-point
-  ;;  (error (princ (format "vt-textoids-get-ship-pos: The error was: %s" err)) 2)
+  ;;  (error (princ (format "vt-textoids-get-snake-pos: The error was: %s" err)) 2)
   ;; ) 
 )
 
+;; get the next cell position.  We try to move down first, then left/right (based on coin
+;; toss), and then right/left (opposite direction of the prior attempt).  If all of these
+;; fail we return a value of VT-TEXTOIDS-CELL-DONE-FLAG in the rc to indicate this cell can move
+;; any more.  It is then up to the client to recurse over the remaing cells in the snake
+;; until they too can no longer move.
+(defun vt-textoids-get-next-cell-pos (cur-pos-x cur-pos-y vx vy &optional try-num)
+;;(defun vt-textoids-get-next-cell-pos (cur-pos-x cur-pos-y vx vy try-num)
+  (when (null try-num)
+    (setq try-num 0)
+    )
+  ;;(message "vt-textoids-get-next-cell-pos: entered, try-num=%s" try-num)
+  (message "vt-textoids-get-next-cell-pos: entered, cur-pos-x=%s,cur-pos-y=%s,vx=%s,vy=%s,try-num=%s" cur-pos-x cur-pos-y vx vy try-num)
+  (message "vt-textoids-get-next-cell-pos: entered, has-brick=%s" (vt-textoids-has-brick (+ cur-pos-x vx) (+ cur-pos-y vy)))
+  (let ((result nil))
+    (catch 'get-next-cell-error
+      (cond
+       ((< try-num 0)
+        ;;(message "vt-textoids-get-next-cell-pos: invalid try-num.  Returning" )
+        (throw 'get-next-cell-error "vt-textoids-get-next-cell-pos: invalid try-num."))
+       
+       ((>= try-num 2)
+        ;; cell is at the end of the line
+        ;; this is the recursive "bottoming-out" condition
+        (setq result (append '(0 0) (list  VT-TEXTOIDS-CELL-DONE-FLAG)))
+        )
+
+       ;; no brick found path
+       ((not (vt-textoids-has-brick (+ cur-pos-x vx) (+ cur-pos-y vy)))
+        ;;(setq result (+ cur-pos-x vx) (+ cur-pos-y vy))
+        ;; return result with rc=0
+        (setq result (list (+ cur-pos-x vx) (+ cur-pos-y vy) 0))
+        )
+
+       ;; brick found path.  Try left/right.
+       ((= try-num 0)
+        (message "try-num=0 path")
+        (vt-textoids-get-next-cell-pos cur-pos-x cur-pos-y (if (equal (random 2) 0) 1 -1) 0 (1+ try-num)))
+       
+       ((= try-num 1)
+        (vt-textoids-get-next-cell-pos cur-pos-x cur-pos-y (* vx -1) 0 (1+ try-num))
+        )
+       
+      )
+
+       ;; return our result
+       result
+       )
+    )
+)
+
 (defun vt-textoids-update-game ()
+  ;; call new function to debug
+  (vt-textoids-get-next-cell-pos (vt-textoids-get-point-x (car (vt-snake))) (vt-textoids-get-point-y (car (vt-snake))) vt-textoids-snake-vx vt-textoids-snake-vy)
   ;; we seem to have to set the buffer each time
   (set-buffer "vt-textoids-canvas")
   ;;(message "vt-textoids-update-game: entered, draw-cnt=%s" vt-textoids-draw-count)
   (let ((point 0) (tail nil))
-    ;;(setq point (+ (* vt-textoids-ship-x vt-textoids-canvas-width) vt-textoids-ship-y)) 
-    (vt-textoids-get-ship-pos)
-    ;;(setq point (vt-textoids-get-ship-pos))
+    ;;(setq point (+ (* vt-textoids-snake-x vt-textoids-canvas-width) vt-textoids-snake-y)) 
+    (vt-textoids-get-snake-pos)
+    ;;(setq point (vt-textoids-get-snake-pos))
     (setq point vt-textoids-cand-point)
 
-    ;; push onto ship history
-    ;; (when (>= vt-textoids-ship-head (1-  vt-textoids-ship-length))
-    ;;   (setq tail (vt-textoids-bump-ship)))
-    (when (> (length vt-textoids-ship) vt-textoids-ship-length)
-      (let ((rev-ship (reverse vt-textoids-ship)))
-        (setq tail (car rev-ship))
-        (setq vt-textoids-ship (reverse (cdr rev-ship)))
+    ;; push onto snake history
+    ;; (when (>= vt-textoids-snake-head (1-  vt-textoids-snake-length))
+    ;;   (setq tail (vt-textoids-bump-snake)))
+    (when (> (length vt-textoids-snake) vt-textoids-snake-length)
+      (let ((rev-snake (reverse vt-textoids-snake)))
+        (setq tail (car rev-snake))
+        (setq vt-textoids-snake (reverse (cdr rev-snake)))
       )
     )
 
     (message "vt-textoids-update-game: tail=%s" tail )
 
     (condition-case err
-        ;;(aset vt-textoids-ship vt-textoids-ship-head point)
-        (setq vt-textoids-ship (cons point vt-textoids-ship))
+        ;;(aset vt-textoids-snake vt-textoids-snake-head point)
+        (setq vt-textoids-snake (cons point vt-textoids-snake))
       (error (princ (format "The error was: %s" err))
         2
     ))
 
-    (setq vt-textoids-ship-head (% (1+ vt-textoids-ship-head) vt-textoids-ship-length))
-    ;;(message "***vt-textoids-update-game: ship-head=%s" vt-textoids-ship-head)
+    (setq vt-textoids-snake-head (% (1+ vt-textoids-snake-head) vt-textoids-snake-length))
+    ;;(message "***vt-textoids-update-game: snake-head=%s" vt-textoids-snake-head)
     
     (goto-char point)
     (delete-char 1)
-    (insert vt-textoids-ship-char)
+    (insert vt-textoids-snake-char)
     (put-text-property (1- (point))
                        (point)
                        'face
                        "vt-face-blue-\#0000ff")
 
-    (setq vt-textoids-ship-x (+ vt-textoids-ship-x vt-textoids-ship-vx))
-    (setq vt-textoids-ship-y (+ vt-textoids-ship-y vt-textoids-ship-vy))
+    (setq vt-textoids-snake-x (+ vt-textoids-snake-x vt-textoids-snake-vx))
+    (setq vt-textoids-snake-y (+ vt-textoids-snake-y vt-textoids-snake-vy))
     
     (setq vt-textoids-draw-count (+ vt-textoids-draw-count 1))
 
@@ -346,7 +419,7 @@
   (vt-textoids-draw-border)
   ;;(vt-textoids-init-bricks)
   (vt-textoids-draw-bricks)
-  (vt-textoids-init-ship)
+  (vt-textoids-init-snake)
 
   ;(vt-gamegrid-override-start-timer vt-textoids-tick-period 'vt-textoids-update-game)
   ;;(run-with-timer vt-textoids-tick-period vt-textoids-draw-throttle 'vt-textoids-update-game)
@@ -362,4 +435,8 @@
   ;;(gamegrid-kill-timer)
 )
 
+;; this is just a dummy function to aid in unit testing
+(defun vt-textoids-do-something ()
+  7
+  )
 ;;(vt-textoids-run-game)
