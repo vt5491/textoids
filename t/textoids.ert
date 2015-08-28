@@ -1,5 +1,12 @@
 ;;(require 'cl)
 ;; note: had trouble using cl-flet for mocks
+;;
+;; how to run to a single test
+;; 1) first 'eval-buffer this buffer to make the tests defined
+;; 2) in scratch buffer put something like:
+;; (ert "vt-textoids-get-next-cell-pos-test-3")
+;;
+;; and then C-x C-e it
 
 (ert-deftest addition-test ()
        (should (= (+ 1 2) 3)))
@@ -30,13 +37,13 @@
   (let ((result nil)) 
     (flet
         ((vt-textoids-has-brick (x y) (if (= x 2) t nil))
-         (rand (n) 0))
+         (rand (n) 1))
 
       (setq result (vt-textoids-get-next-cell-pos 2 2 0 1))
       (message "***result=%s" result)
-      ;; (should (= (nth 0 result) 1))
-      ;; (should (= (nth 1 result) 2))
-      ;; (should (= (nth 2 result) 0))
+      (should (= (nth 0 result) 1))
+      (should (= (nth 1 result) 2))
+      (should (= (nth 2 result) 0))
       ))
   )
 

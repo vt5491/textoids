@@ -117,26 +117,26 @@
                "vt-face-grey-#7f7f7f")
         (setq i (1+ i))))
     ;; the sides
-    (cl-loop for i from 1 to (1- vt-textoids-canvas-height) do
-             (+ 1 1)
-      ;; ;; left side
-      ;; (setq point (1+ (* i vt-textoids-canvas-width)))
-      ;; (goto-char point)
-      ;; (delete-char 1)
-      ;; (insert vt-textoids-border-char)
-      ;; (put-text-property (1- (point))
-      ;;                    (point)
-      ;;                    'face
-      ;;                    "vt-face-grey-#7f7f7f")
-      ;; right side
-      ;; (setq point (+ point (- vt-textoids-canvas-width 2)))
-      ;; (goto-char point)
-      ;; (delete-char 1)
-      ;; (insert vt-textoids-border-char)
-      ;; (put-text-property (1- (point))
-      ;;                    (point)
-      ;;                    'face
-      ;;                    "vt-face-grey-#7f7f7f")
+    (cl-loop for i from 1 to (- vt-textoids-canvas-height 2) do
+             ;; (+ 1 1)                    
+      ;; left side
+      (setq point (1+ (* i vt-textoids-canvas-width)))
+      (goto-char point)
+      (delete-char 1)
+      (insert vt-textoids-border-char)
+      (put-text-property (1- (point))
+                         (point)
+                         'face
+                         "vt-face-grey-#7f7f7f")
+      ;;right side
+      (setq point (+ point (- vt-textoids-canvas-width 2)))
+      (goto-char point)
+      (delete-char 1)
+      (insert vt-textoids-border-char)
+      (put-text-property (1- (point))
+                         (point)
+                         'face
+                         "vt-face-grey-#7f7f7f")
      )
     ;; lower line
     (let ((i 0))
@@ -234,9 +234,13 @@
   )
 
 ;; return true if brick is found at point
+;; In this case a "brick" is a logicial "brick".  Anything that obstructs the
+;; flow of the snake is considered a "brick", including bricks, borders, and snake
+;; cells themselves.  Yes, all the brick test functions should be renamed to
+;; use "blockage" or "impediment" instead of brick.
 (defun vt-textoids-brick-at-point(p)
   (let ((found nil))
-    (when (string-equal (buffer-substring-no-properties  p (1+  p)) (char-to-string vt-textoids-brick-char))
+    (when (or (string-equal (buffer-substring-no-properties  p (1+  p)) (char-to-string vt-textoids-brick-char)) (string-equal (buffer-substring-no-properties  p (1+  p)) (char-to-string vt-textoids-border-char)) (string-equal (buffer-substring-no-properties  p (1+  p)) (char-to-string vt-textoids-snake-char)))
         (setq found t)
       )
     found
@@ -287,7 +291,7 @@
 
 ;; get the next cell position.  We try to move down first, then left/right (based on coin
 ;; toss), and then right/left (opposite direction of the prior attempt).  If all of these
-;; fail we return a value of VT-TEXTOIDS-CELL-DONE-FLAG in the rc to indicate this cell can move
+;; fail we return a value of VT-TEXTOIDS-CELL-DONE-FLAG in the rc to indicate this cell cannot move
 ;; any more.  It is then up to the client to recurse over the remaing cells in the snake
 ;; until they too can no longer move.
 (defun vt-textoids-get-next-cell-pos (cur-pos-x cur-pos-y vx vy &optional try-num)
@@ -305,7 +309,7 @@
         ;;(message "vt-textoids-get-next-cell-pos: invalid try-num.  Returning" )
         (throw 'get-next-cell-error "vt-textoids-get-next-cell-pos: invalid try-num."))
        
-       ((>= try-num 2)
+       ((> try-num 2)
         ;; cell is at the end of the line
         ;; this is the recursive "bottoming-out" condition
         (setq result (append '(0 0) (list  VT-TEXTOIDS-CELL-DONE-FLAG)))
@@ -313,18 +317,25 @@
 
        ;; no brick found path
        ((not (vt-textoids-has-brick (+ cur-pos-x vx) (+ cur-pos-y vy)))
+        (message "no brick found path")
         ;;(setq result (+ cur-pos-x vx) (+ cur-pos-y vy))
         ;; return result with rc=0
         (setq result (list (+ cur-pos-x vx) (+ cur-pos-y vy) 0))
         )
 
-       ;; brick found path.  Try left/right.
-       ((= try-num 0)
-        (message "try-num=0 path")
-        (vt-textoids-get-next-cell-pos cur-pos-x cur-pos-y (if (equal (random 2) 0) 1 -1) 0 (1+ try-num)))
+       ;; brick found path and going down.  Try left/right random.
+       ((and (= try-num 0) (= vy 1))
+        (message "try-num=0 down path")
+        (setq result (vt-textoids-get-next-cell-pos cur-pos-x cur-pos-y (if (equal (random 2) 0) -1 1) 0 (1+ try-num))))
+
+       ;; brick found path, but were moving sideways.  Want to keep moving in same dir
+       ((and (= try-num 0) (not (= vy 1)))
+        (message "try-num=0 sideways path")
+        (setq result (vt-textoids-get-next-cell-pos cur-pos-x cur-pos-y vx 0 (1+ try-num))))
        
        ((= try-num 1)
-        (vt-textoids-get-next-cell-pos cur-pos-x cur-pos-y (* vx -1) 0 (1+ try-num))
+        (message "try-num=1 path")
+        (setq result (vt-textoids-get-next-cell-pos cur-pos-x cur-pos-y (* vx -1) 0 (1+ try-num)))
         )
        
       )
@@ -337,15 +348,21 @@
 
 (defun vt-textoids-update-game ()
   ;; call new function to debug
-  (vt-textoids-get-next-cell-pos (vt-textoids-get-point-x (car (vt-snake))) (vt-textoids-get-point-y (car (vt-snake))) vt-textoids-snake-vx vt-textoids-snake-vy)
+  ;;(vt-textoids-get-next-cell-pos (vt-textoids-get-point-x (car (vt-snake))) (vt-textoids-get-point-y (car (vt-snake))) vt-textoids-snake-vx vt-textoids-snake-vy)
   ;; we seem to have to set the buffer each time
   (set-buffer "vt-textoids-canvas")
   ;;(message "vt-textoids-update-game: entered, draw-cnt=%s" vt-textoids-draw-count)
-  (let ((point 0) (tail nil))
+  (let ((point 0) (tail nil) (result nil))
     ;;(setq point (+ (* vt-textoids-snake-x vt-textoids-canvas-width) vt-textoids-snake-y)) 
-    (vt-textoids-get-snake-pos)
+    ;;vt-x(vt-textoids-get-snake-pos)
+    (setq result (vt-textoids-get-next-cell-pos vt-textoids-snake-x vt-textoids-snake-y vt-textoids-snake-vx vt-textoids-snake-vy))
+    (setq vt-textoids-snake-x (nth 0 result))
+    (setq vt-textoids-snake-y (nth 1 result))
+    (message "vt-textoids-update-game: snake-x=%s, snake-y=%s" vt-textoids-snake-x vt-textoids-snake-y)
+
     ;;(setq point (vt-textoids-get-snake-pos))
-    (setq point vt-textoids-cand-point)
+    ;;vt-x(setq point vt-textoids-cand-point)
+    (setq point (vt-textoids-get-point vt-textoids-snake-x vt-textoids-snake-y))
 
     ;; push onto snake history
     ;; (when (>= vt-textoids-snake-head (1-  vt-textoids-snake-length))
@@ -377,8 +394,8 @@
                        'face
                        "vt-face-blue-\#0000ff")
 
-    (setq vt-textoids-snake-x (+ vt-textoids-snake-x vt-textoids-snake-vx))
-    (setq vt-textoids-snake-y (+ vt-textoids-snake-y vt-textoids-snake-vy))
+    ;;vt-x (setq vt-textoids-snake-x (+ vt-textoids-snake-x vt-textoids-snake-vx))
+    ;;vt-x (setq vt-textoids-snake-y (+ vt-textoids-snake-y vt-textoids-snake-vy))
     
     (setq vt-textoids-draw-count (+ vt-textoids-draw-count 1))
 
