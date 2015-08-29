@@ -18,6 +18,8 @@
 (global-set-key "\C-cz" 'vt-textoids-run-game)
 (global-set-key "\C-cx" 'vt-textoids-kill-timer)
 
+;; set this to nil to see pure ascii charactars (which is cool in its own way)
+(setq vt-textoids-use-glyphs t)
 (setq VT-TEXTOIDS-CELL-DONE-FLAG -100)
 (setq VT-TEXTOIDS-SNAKE-DONE-FLAG -200)
 
@@ -99,10 +101,11 @@
     ;; note: the following has to start at 2, otherwise get a big box to the right
     (cl-loop for j from 2 to (- vt-textoids-canvas-width 0) do
       (goto-char (+ (* i vt-textoids-canvas-width) j))
-      (put-text-property (1- (point))
-                     (point)
-                     'face
-                     "vt-face-black-#000000")
+      (when vt-textoids-use-glyphs
+        (put-text-property (1- (point))
+                           (point)
+                           'face
+                           "vt-face-black-#000000"))
       )
   )
 )
@@ -117,10 +120,11 @@
         (goto-char point)
         (delete-char 1)
         (insert vt-textoids-border-char)
-        (put-text-property (1- (point))
-		       (point)
-		       'face
-               "vt-face-grey-#7f7f7f")
+        (when vt-textoids-use-glyphs
+          (put-text-property (1- (point))
+                             (point)
+                             'face
+                             "vt-face-grey-#7f7f7f"))
         (setq i (1+ i))))
     ;; the sides
     (cl-loop for i from 1 to (- vt-textoids-canvas-height 2) do
@@ -130,19 +134,21 @@
       (goto-char point)
       (delete-char 1)
       (insert vt-textoids-border-char)
-      (put-text-property (1- (point))
-                         (point)
-                         'face
-                         "vt-face-grey-#7f7f7f")
+      (when vt-textoids-use-glyphs
+        (put-text-property (1- (point))
+                           (point)
+                           'face
+                           "vt-face-grey-#7f7f7f"))
       ;;right side
       (setq point (+ point (- vt-textoids-canvas-width 2)))
       (goto-char point)
       (delete-char 1)
       (insert vt-textoids-border-char)
-      (put-text-property (1- (point))
-                         (point)
-                         'face
-                         "vt-face-grey-#7f7f7f")
+      (when vt-textoids-use-glyphs
+        (put-text-property (1- (point))
+                           (point)
+                           'face
+                           "vt-face-grey-#7f7f7f"))
      )
     ;; lower line
     (let ((i 0))
@@ -151,12 +157,13 @@
         (goto-char point)
         (delete-char 1)
         (insert vt-textoids-border-char)
-        (put-text-property (1- (point))
-                         (point)
-                         'face
-                         "vt-face-grey-#7f7f7f"
-                         ;;"vt-face-black-\#000000"
-                         )
+        (when vt-textoids-use-glyphs
+          (put-text-property (1- (point))
+                             (point)
+                             'face
+                             "vt-face-grey-#7f7f7f"
+                             ;;"vt-face-black-\#000000"
+                             ))
         (setq i (1+ i))))
 )) 
 
@@ -174,10 +181,11 @@
             (goto-char (+  point i))
             (delete-char 1)
             (insert vt-textoids-brick-char)
-            (put-text-property (1- (point))
-                               (point)
-                               'face
-                               "vt-face-red-\#ff0000"))
+            (when vt-textoids-use-glyphs
+              (put-text-property (1- (point))
+                                 (point)
+                                 'face
+                                 "vt-face-red-\#ff0000")))
           (setq i (1+ i))
           ))
       (setq i (1+ i)))
@@ -320,11 +328,12 @@
     (goto-char point)
     (delete-char 1)
     (insert vt-textoids-snake-char)
-    (put-text-property (1- (point))
-                       (point)
-                       'face                       
-                       vt-textoids-snake-color
-                       )
+    (when vt-textoids-use-glyphs
+      (put-text-property (1- (point))
+                         (point)
+                         'face                       
+                         vt-textoids-snake-color
+                         ))
     
     (setq vt-textoids-draw-count (+ vt-textoids-draw-count 1))
 
@@ -333,11 +342,12 @@
       (goto-char tail)
       (delete-char 1)
       (insert vt-textoids-bg-char)
-      (put-text-property (1- (point))
-                         (point)
-                         'face
-                         "vt-face-black-\#000000"                         
-                         ))
+      (when vt-textoids-use-glyphs
+        (put-text-property (1- (point))
+                           (point)
+                           'face
+                           "vt-face-black-\#000000"                         
+                           )))
     
     (if (> vt-textoids-draw-count vt-textoids-draw-throttle)
         ;; Note: these do not reliably kill the timer.  use 'cancel-function-timers'
